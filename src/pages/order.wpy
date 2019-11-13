@@ -1,0 +1,217 @@
+<template>
+  <view class="order_container">
+    <!-- 选择收货地址 -->
+    <view class="chooseAddress" wx:if="{{!isHaveAddress}}">
+      <van-button type="info" size="small" @tap="chooseAddress">+ 选择收货地址</van-button>
+    </view>
+    <!-- 收货人信息区域 -->
+    <view class="address_box" wx:else>
+      <!-- 收货人、联系电话 -->
+      <view class="box1">
+        <text>收货人：{{addressInfo.userName}}</text>
+        <view @tap="chooseAddress">
+          <text>联系电话：{{addressInfo.telNumber}}</text>
+          <van-icon name="arrow" />
+        </view>
+      </view>
+      <!-- 收货地址 -->
+      <view class="box2">
+        <text>收货地址：{{addressStr}}</text>
+      </view>
+    </view>
+    <!-- 分割线 -->
+    <image src="/assets/images/cart_border@2x.png" class="sep_line" />
+    <!-- 商品列表 -->
+    <view class="goods_list">
+      <block wx:for="{{cart}}" wx:key="id">
+        <van-card
+          num="{{item.count}}"
+          price="{{item.price}}"
+          title="{{item.name}}"
+          thumb="{{ item.pic }}"
+        />
+      </block>
+    </view>
+    <!-- 登录后下单 -->
+    <van-button
+      wx:if="{{!isLogin}}"
+      type="primary"
+      size="large"
+      class="btnLogin"
+      open-type="getUserInfo"
+      bindgetuserinfo="onGotUserInfo"
+    >登录后下单</van-button>
+    <!-- 订单支付区域 -->
+    <van-submit-bar price="{{ amount }}" button-text="提交订单" bind:submit="onSubmit" wx:else />
+  </view>
+</template>
+
+<script>
+import wepy from 'wepy'
+export default class extends wepy.page {
+  config = {
+    navigationBarTitleText: '确认订单'
+  }
+  data = {
+    addressInfo: null,
+    cart: [],
+    // 是否登陆
+    isLogin: false
+  }
+  methods = {
+    async chooseAddress() {
+      const res = await wepy.chooseAddress().catch(err => err)
+      // console.log(res)
+      if (res.errMsg !== 'chooseAddress:ok') {
+        return
+      } else {
+        this.addressInfo = res
+        wepy.setStorageSync('addressInfo', res)
+        this.$apply()
+      }
+    },
+    // 获取用户信息
+    async onGotUserInfo(userInfo) {
+      // 判断是否获取用户信息失败
+      if (userInfo.detail.errMsg !== 'getUserInfo:ok') {
+        return wepy.baseToast('获取用户信息失败！')
+      }
+    //   console.log(userInfo)
+      // 获取用户登录的凭证 Code
+      const loginRes = await wepy.login()
+    //   console.log(loginRes)
+      if (loginRes.errMsg !== 'login:ok') {
+        return wepy.baseToast('微信登录失败！')
+      }
+      // 登录的参数
+      const loginParams = {
+        code: loginRes.code,
+        encryptedData: userInfo.detail.encryptedData,
+        iv: userInfo.detail.iv,
+        rawData: userInfo.detail.rawData,
+        signature: userInfo.detail.signature
+      }
+      wepy.setStorageSync('token', 'fake token')
+      this.isLogin = true
+      this.$apply()
+      // 发起登录的请求，换取登录成功之后的 Token 值
+    //   const { data: res } = await wepy.post('/users/wxlogin', loginParams)
+    //   console.log(res)
+    //   if (res.meta.status !== 200) {
+    //     return wepy.baseToast('微信登录失败！')
+    //   }
+    //   // 把登录成功之后的 Token 字符串，保存到 Storage 中
+    //   wepy.setStorageSync('token', res.message.token)
+    //   this.islogin = true
+    //   this.$apply()
+    },
+    // 支付订单
+    async onSubmit() {
+        if(this.amount<=0)return wepy.baseToast('订单金额不能为0！')
+        if(this.addressStr.length<=0) return wepy.baseToast('请选择收货地址！')
+        // 创建订单
+        const {data:res}=await wepy.post('/my/orders/create',{
+            // order_price:this.amount/100,
+            order_price:0.01,
+            consignee_addr:this.addressStr,
+            order_detail:JSON.stringify(this.cart),
+            goods:this.cart.map(item=>{
+                return {
+                    goods_id:item.id,
+                    goods_number:item.count,
+                    goods_price:item.price
+                }
+            })
+        })
+        if(res.meta.status!==200) return wepy.baseToast('创建订单失败！')
+        const orderInfo=res.message
+        // 生成预支付订单
+        const {data:orderRes}=await wepy.post('/my/orders/req_unifiedorder',{
+            order_number:orderInfo.order_number
+        })
+        if(res.meta.status!==200) return wepy.baseToast('生成预支付订单失败！')
+        const payResult=await wepy.requestPayment(orderRes.message.pay).catch(err=>err)
+        if(payResult.errMsg==='requestPayment:fail cancel'){
+            return wepy.baseToast('取消订单支付！')
+        }
+        // 用户完成了支付
+        // 检查用户支付的结果
+        const {data:payCheckResult}=await wepy.post('/my/orders/chkOrder',{
+             order_number:orderInfo.order_number
+        })
+        if(payCheckResult.meta.status!==200) return wepy.baseToast('订单支付失败！')
+        // 提示用户支付成功
+        wepy.showToast({
+            title:'支付成功！'
+        })
+        // 跳转到订单列表页面
+        wepy.navigateTo({
+            url:'/pages/orderlist'
+        })
+    }
+  }
+  computed = {
+    isHaveAddress() {
+      return this.addressInfo ? true : false
+    },
+    addressStr() {
+      if (!this.addressInfo) return
+      return (
+        this.addressInfo.provinceName +
+        this.addressInfo.cityName +
+        this.addressInfo.countyName +
+        this.addressInfo.detailInfo
+      )
+    },
+    // 订单总金额
+    amount(){
+        let total=0
+        this.cart.forEach(item => {
+            total+= item.price*item.count
+        })
+        return total*100
+    }
+  }
+  onLoad() {
+    this.addressInfo = wepy.getStorageSync('addressInfo') || null
+    //   从购物车列表中过滤出勾选的商品形成新数组
+    const newArr = this.$parent.globalData.cart.filter(item => item.isCheck)
+    this.cart = newArr
+  }
+}
+</script>
+
+<style lang="less" scoped>
+.chooseAddress {
+  text-align: center;
+  padding: 20rpx 0;
+}
+.sep_line {
+  height: 7px;
+  width: 100%;
+  display: block;
+}
+.address_box {
+  font-size: 26rpx;
+  padding: 0 10rpx;
+  .box1 {
+    display: flex;
+    justify-content: space-between;
+    padding: 30rpx 0;
+  }
+  .box2 {
+    padding-bottom: 30rpx;
+  }
+}
+.van-card {
+  border-bottom: 1rpx solid #eee;
+}
+.btnLogin {
+  position: fixed;
+  bottom: 0;
+  width: 100%;
+}
+.order_container {
+  padding-bottom: 50px;
+}
+</style>

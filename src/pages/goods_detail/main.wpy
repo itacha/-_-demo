@@ -1,0 +1,246 @@
+<template>
+  <view class="goodsDetail_container">
+    <!-- 轮播图区域 -->
+    <swiper indicator-dots autoplay circular>
+      <block wx:for="{{goods_detail.pics}}" wx:key="index">
+        <swiper-item>
+          <image src="{{item.pics_big}}" @tap="preview(item.pics_big)" />
+        </swiper-item>
+      </block>
+    </swiper>
+    <!-- 商品信息区域 -->
+    <view class="goods_info">
+      <!-- 价格、名称、运费 -->
+      <view class="box1">
+        <view class="price">￥{{goods_detail.goods_price}}</view>
+        <view class="goods_name">
+          <view class="left">{{goods_detail.goods_name}}</view>
+          <view class="right">
+            <van-icon name="star-o" />
+            <view>收藏</view>
+          </view>
+        </view>
+        <view class="yunfei">快递：免运费</view>
+      </view>
+      <view class="sep_line"></view>
+      <!-- 促销已选 -->
+      <view class="box2">
+        <view>
+          <text>促销</text>
+          <text>满300元减30元</text>
+        </view>
+        <view>
+          <text>已选</text>
+          <text>黑色/S/1件</text>
+        </view>
+      </view>
+      <view class="sep_line"></view>
+      <!-- 收货地址 -->
+      <view class="box3" @tap="chooseAddress">
+        <view>
+          <text>送至</text>
+          <text>{{addressStr}}</text>
+        </view>
+        <van-icon name="arrow" />
+      </view>
+      <view class="sep_line"></view>
+    </view>
+    <!-- 商品详情区域 -->
+    <van-tabs>
+      <van-tab title="图文详情">
+        <!-- <wxparse data="{{goods_detail.goods_introduce}}"></wxparse> -->
+      </van-tab>
+      <van-tab title="规格参数" class="tab2">
+        <block wx:for="{{goods_detail.attrs}}" wx:key="index">
+          <van-row>
+            <van-col span="10">{{item.attr_name}}</van-col>
+            <van-col span="14">{{item.attr_value}}</van-col>
+          </van-row>
+        </block>
+      </van-tab>
+    </van-tabs>
+    <van-goods-action>
+  <van-goods-action-icon
+    icon="chat-o"
+    text="客服"
+    open-type="contact"
+  />
+  <van-goods-action-icon
+    icon="cart-o"
+    text="购物车"
+    link-type="switchTab"
+    url="/pages/tabs/cart"
+    info="{{total}}"
+  />
+  <van-goods-action-button
+    text="加入购物车"
+    type="warning"
+    bind:click="addToCart"
+  />
+  <van-goods-action-button
+    text="立即购买"
+    bind:click="onClickButton"
+  />
+</van-goods-action>
+  </view>
+</template>
+
+<script>
+import wepy from 'wepy'
+export default class extends wepy.page {
+  data = {
+    goods_id: '',
+    goods_detail: {},
+    addressInfo:null
+  }
+  onLoad(options) {
+    // console.log(options)
+    this.goods_id = options.goods_id
+    this.getGoodsDetail()
+  }
+  methods = {
+    // 预览图片
+    preview(current) {
+      wepy.previewImage({
+        current: current, // 当前显示图片的http链接
+        // map遍历数组，返回一个新数组
+        urls: this.goods_detail.pics.map(x => x.pics_big) // 需要预览的图片http链接列表
+      })
+    },
+      // 获取用户的收货地址
+    async chooseAddress(){
+      const res = await wepy.chooseAddress().catch(err=>err)
+      console.log(res)
+      if (res.errMsg!=='chooseAddress:ok') {
+        return wepy.baseToast('获取收货地址失败！')
+      }
+      this.addressInfo=res
+      wepy.setStorageSync('adress',res)
+      this.$apply()
+    },
+    // 加入购物车
+    addToCart() {
+      // console.log(this.$parent)
+      this.$parent.addGoodsToCart(this.goods_detail)
+      wepy.showToast({
+        title:'已加入购物车',
+        icon:'success'
+      })
+    }
+  }
+  computed = {
+    addressStr() {
+      if (this.addressInfo===null) {
+        return '请选择收货地址'
+      }
+      const addr=this.addressInfo
+      const str=addr.provinceName+addr.cityName+addr.countyName+addr.detailInfo
+      return str
+    },
+    // 所有已勾选的商品数量
+    total() {
+      return this.$parent.globalData.total
+    }
+  }
+  async getGoodsDetail() {
+    const { data: res } = await wepy.get('/goods/detail', {
+      goods_id: this.goods_id
+    })
+    if (res.meta.status !== 200) {
+      return wepy.baseToast()
+    }
+    this.goods_detail = res.message
+    this.$apply()
+  }
+}
+</script>
+
+<style lang="less">
+swiper {
+  height: 750rpx;
+  image {
+    width: 100%;
+    height: 100%;
+  }
+}
+.goods_info {
+  .box1 {
+    padding: 0 10rpx;
+    .price {
+      font-size: 40rpx;
+      color: red;
+      margin: 20rpx 0;
+    }
+    .goods_name {
+      display: flex;
+      justify-content: space-between;
+      .left {
+        font-size: 26rpx;
+        padding-right: 40rpx;
+      }
+      .right {
+        width: 200rpx;
+        text-align: center;
+        border-left: 1rpx solid #eee;
+        > view {
+          font-size: 20rpx;
+        }
+      }
+    }
+    .yunfei {
+      font-size: 26rpx;
+      color: #666;
+      font-weight: 700;
+      line-height: 80rpx;
+    }
+  }
+  .sep_line {
+    border-bottom: 15rpx solid #efefef;
+  }
+  .box2 {
+    font-size: 24rpx;
+    padding: 0 10rpx;
+    > view {
+      line-height: 80rpx;
+      text:nth-child(1) {
+        margin-right: 20rpx;
+      }
+      text:nth-child(2) {
+        color: #666;
+      }
+    }
+  }
+  .box3 {
+    display: flex;
+    justify-content: space-between;
+    font-size: 24rpx;
+    padding: 25rpx 10rpx;
+    > view {
+      text:nth-child(1) {
+        margin-right: 20rpx;
+      }
+      text:nth-child(2) {
+        color: #666;
+      }
+    }
+  }
+}
+.tab2 {
+  font-size: 24rpx;
+  .van-row {
+    border-top: 1rpx solid #eee;
+    .van-col {
+      padding: 25rpx 0 25rpx 10rpx;
+      &:nth-child(1) {
+        border-right: 1rpx solid #eee;
+      }
+    }
+  }
+}
+.van-tabs{
+  z-index:0;
+}
+.goodsDetail_container{
+  padding-bottom: 50px;
+}
+</style>

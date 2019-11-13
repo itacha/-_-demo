@@ -1,0 +1,180 @@
+<template>
+  <view>
+    <!-- 空白的购物车 -->
+    <view class="empty_cart" wx:if="{{isEmpty}}">
+      <image src="/assets/images/cart_empty@2x.png" />
+      <view>哎呦，购物车是空的哦~</view>
+    </view>
+    <!-- 非空的购物车 -->
+    <view class="cart_container" wx:else>
+      <van-cell title="购物车列表" icon="shop-o" />
+      <!-- 购物车商品列表 -->
+      <block wx:for="{{cart}}" wx:key="id">
+        <van-swipe-cell right-width="{{ 65 }}" left-width="{{ 0.1 }}">
+          <van-card title="{{item.name}}">
+            <view slot="desc" class="desc">
+              <text class="price">￥{{item.price}}</text>
+              <van-stepper
+                value="{{ item.count }}"
+                bind:change="countChange"
+                data-id="{{item.id}}"
+              />
+            </view>
+            <view slot="thumb" class="thumb">
+              <!-- 复选框 -->
+              <van-checkbox
+                value="{{item.isCheck}}"
+                bind:change="statusChange"
+                data-id="{{item.id}}"
+                checked-color="#d81e06"
+              ></van-checkbox>
+              <!-- 缩略图 -->
+              <image src="{{item.pic}}" />
+            </view>
+          </van-card>
+          <view slot="right" class="close" @tap="close({{item.id}})">删除</view>
+        </van-swipe-cell>
+      </block>
+      <!-- 提交订单区域 -->
+      <van-submit-bar price="{{amount}}"
+        button-text="提交订单"
+        bind:submit="submitOrder"
+        tip="{{ false }}"
+      >
+        <van-checkbox value="{{isFullCheck}}"  checked-color="#d81e06" class="fullCheck" @change="onFullCheckChange">全选</van-checkbox>
+      </van-submit-bar>
+    </view>
+  </view>
+</template>
+
+<script>
+import wepy from 'wepy'
+
+export default class extends wepy.page {
+  data = {
+    cart: []
+  }
+  methods = {
+    //   商品数量变化触发
+    countChange(e) {
+      this.$parent.updateGoodsCount(e.target.dataset.id, e.detail)
+    },
+    //   商品前面的复选框状态变化触发
+    statusChange(e) {
+      const status = e.detail
+      const id = e.target.dataset.id
+      this.$parent.updateGoodsStatus(id, status)
+    },
+    //   删除对应的id
+    close(id) {
+      this.$parent.removeGoods(id)
+    },
+    // 全选框变化触发
+    onFullCheckChange(e){
+      const status=e.detail
+      this.$parent.updateAllGoodsStatus(status)
+    },
+    // 提交订单
+    submitOrder() {
+      if (this.amount===0) {
+        return wepy.baseToast('订单金额为0')
+      }
+      wepy.navigateTo({
+        url:'/pages/order'
+      })
+    }
+  }
+  computed = {
+    // 判断购物车是否为空
+    isEmpty() {
+      if (this.cart.length > 0) {
+        return false
+      }
+      return true
+    },
+    // 总价格 单位是 分
+    amount() {
+      let total=0
+      this.cart.forEach(item => {
+        if (item.isCheck) {
+          total+=item.price*item.count
+        }
+      })
+      return total*100
+    },
+    // 商品是否全选中
+    isFullCheck() {
+      const allCount=this.cart.length
+      let c=0
+      this.cart.forEach(item=>{
+        if (item.isCheck) {
+          c++
+        }
+      })
+      return c===allCount?true:false
+    }
+  }
+  onLoad() {
+    this.cart = this.$parent.globalData.cart
+  }
+}
+</script>
+
+<style lang="less">
+.empty_cart {
+  font-size: 26rpx;
+  color: #666;
+  text-align: center;
+  padding-top: 200rpx;
+  image {
+    width: 200rpx;
+    height: 200rpx;
+  }
+}
+.desc {
+  display: flex;
+  position: absolute;
+  bottom: 0;
+  justify-content: space-between;
+  width: 100%;
+  align-items: center;
+  .price {
+    color: red;
+    font-weight: bold;
+    font-size: 12px;
+  }
+}
+.van-card {
+  border-block: 1rpx solid #eee;
+  padding-left: 7px !important;
+}
+.thumb {
+  display: flex;
+  align-items: center;
+  width: 118px;
+  image {
+    width: 90px !important;
+    height: 90px !important;
+    margin-left: 8px;
+  }
+}
+.van-card__thumb {
+  width: 118px !important;
+}
+.close {
+  background-color: #ff4444;
+  width: 65px;
+  height: 100%;
+  color: white;
+  font-size: 13px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.cart_container{
+  padding-bottom: 50px;
+}
+.fullCheck{
+  margin-left: 7px;
+}
+</style>

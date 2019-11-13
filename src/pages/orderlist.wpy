@@ -1,0 +1,138 @@
+<template>
+  <view>
+    <van-tabs active="{{ active }}" bind:change="tabchange">
+      <van-tab title="全部">
+        <!-- repeat并不是微信提供的，而是wepy框架提供的 -->
+        <repeat for="{{allOrderList}}" key="index">
+          <order-item :order="item"></order-item>
+        </repeat>
+      </van-tab>
+      <van-tab title="待付款">
+        <repeat for="{{waitOrderList}}" key="index">
+          <order-item :order="item"></order-item>
+        </repeat>
+      </van-tab>
+      <van-tab title="已付款">
+        <repeat for="{{finishOrderList}}" key="index">
+          <order-item :order="item"></order-item>
+        </repeat>
+      </van-tab>
+    </van-tabs>
+  </view>
+</template>
+
+<script>
+import wepy from 'wepy'
+// 导入自定义的组件
+import orderItem from '@/components/orderitem'
+export default class extends wepy.page {
+  config = {
+    navigationBarTitleText: '订单列表'
+  }
+  components = {
+    'order-item': orderItem
+  }
+  data = {
+    // 默认被激活的标签页的索引
+    active: 0,
+    // 全部订单列表
+    allOrderList: [
+      {
+        order_id: 44,
+        user_id: 12,
+        order_number: 'GD20180507000000000050',
+        order_price: 0.1,
+        order_pay: '0',
+        is_send: '否',
+        trade_no: '',
+        order_fapiao_title: '个人',
+        order_fapiao_company: '',
+        order_fapiao_content: '',
+        consignee_addr: '广州市天河区',
+        pay_status: '0',
+        create_time: 1525407814,
+        update_time: 1525407814,
+        order_detail: JSON.parse(
+          '[{"goods_id":55578,"goods_name":"初语2017秋装新款潮牌女装加绒宽松BF风慵懒卫衣女套头连帽上衣","goods_price":279,"goods_small_logo":"http://image2.suning.cn/uimg/b2c/newcatentries/0070067836-000000000690453616_2_400x400.jpg","counts":1,"selectStatus":true}]'
+        )
+      }
+    ],
+    // 待付款订单列表
+    waitOrderList: [
+      {
+        order_id: 44,
+        user_id: 12,
+        order_number: 'GD20180507000000000050',
+        order_price: 0.1,
+        order_pay: '0',
+        is_send: '否',
+        trade_no: '',
+        order_fapiao_title: '个人',
+        order_fapiao_company: '',
+        order_fapiao_content: '',
+        consignee_addr: '广州市天河区',
+        pay_status: '0',
+        create_time: 1525407814,
+        update_time: 1525407814,
+        order_detail: JSON.parse(
+          '[{"goods_id":55578,"goods_name":"初语2017秋装新款潮牌女装加绒宽松BF风慵懒卫衣女套头连帽上衣","goods_price":279,"goods_small_logo":"http://image4.suning.cn/uimg/b2c/newcatentries/0000000000-000000000190720077_2_200x200.jpg","counts":1,"selectStatus":true}]'
+        )
+      }
+    ],
+    // 已付款订单列表
+    finishOrderList: [
+      {
+        order_id: 44,
+        user_id: 12,
+        order_number: 'GD20180507000000000050',
+        order_price: 0.1,
+        order_pay: '0',
+        is_send: '否',
+        trade_no: '',
+        order_fapiao_title: '个人',
+        order_fapiao_company: '',
+        order_fapiao_content: '',
+        consignee_addr: '广州市天河区',
+        pay_status: '0',
+        create_time: 1525407814,
+        update_time: 1525407814,
+        order_detail: JSON.parse(
+          '[{"goods_id":55578,"goods_name":"初语2017秋装新款潮牌女装加绒宽松BF风慵懒卫衣女套头连帽上衣","goods_price":279,"goods_small_logo":"http://image5.suning.cn/uimg/b2c/newcatentries/0000000000-000000000611256555_2_200x200.jpg","counts":1,"selectStatus":true}]'
+        )
+      }
+    ]
+  }
+  onLoad() {
+    this.getOrderList(this.active)
+  }
+  methods = {
+    // 切换标签页触发
+    tabchange(e) {
+      this.active = e.detail.index
+      this.getOrderList(this.active)
+    }
+  }
+  // 获取订单信息
+  async getOrderList(index) {
+    const { data: res } = await wepy.get('/my/orders/all', { type: index + 1 })
+    if (res.meta.status !== 200) return wepy.baseToast('获取订单列表失败！')
+    res.message.forEach(x => {
+      x.order_detail = JSON.parse(x.order_detail)
+    })
+    switch (index) {
+      case 0:
+        this.allOrderList = res.message.orders
+        break
+      case 1:
+        this.waitOrderList = res.message.orders
+        break
+      default:
+        this.finishOrderList = res.message.orders
+        break
+    }
+  }
+}
+</script>
+
+<style lang="less">
+</style>
